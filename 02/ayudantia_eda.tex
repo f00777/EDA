@@ -1,0 +1,309 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{tikz}
+\usetikzlibrary{shapes.multipart, shapes.geometric, positioning, arrows.meta, trees, fit, backgrounds, babel}
+\usepackage{amsmath}
+\usepackage{xurl}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    literate=
+      {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+      {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+      {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {¿}{{\questiondown}}1 {¡}{{\exclamdown}}1
+}
+\lstset{style=mystyle}
+
+\title{Ayudantía: Estructuras de Datos y Algoritmos (EDA)}
+\author{Material de Apoyo Práctico}
+\date{}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Funciones Recursivas}
+\subsection{Explicación Técnica}
+Una función recursiva es aquella que se llama a sí misma durante su ejecución. Todo algoritmo recursivo debe tener al menos dos partes fundamentales:
+\begin{itemize}
+    \item \textbf{Caso base:} La condición de parada que evita que la función se llame infinitamente.
+    \item \textbf{Paso recursivo:} La lógica que reduce el problema original a un subproblema más pequeño.
+\end{itemize}
+
+\subsection{Diagrama de Árbol de Llamadas}
+\begin{center}
+\begin{tikzpicture}[
+    level distance=1.5cm,
+    level 1/.style={sibling distance=3cm},
+    level 2/.style={sibling distance=1.5cm},
+    every node/.style={circle, draw, minimum size=1cm, fill=blue!10}
+]
+\node {F(3)}
+    child {node {F(2)}
+        child {node {F(1)}}
+        child {node {F(0)}}
+    }
+    child {node {F(1)}};
+\end{tikzpicture}
+\end{center}
+\textit{Diagrama: Representación del estado de las llamadas recursivas (ej. cálculo de Fibonacci).}
+
+\subsection{Ejemplo y Complejidad}
+Ejemplo clásico: Cálculo del factorial de un número $N$.
+\begin{lstlisting}[language=Java]
+public int factorial(int n) {
+    if (n == 0) return 1; // Caso base
+    return n * factorial(n - 1); // Paso recursivo
+}
+\end{lstlisting}
+\textbf{Complejidad Temporal:} $\mathcal{O}(N)$, ya que la función se llama $N$ veces en profundidad. \\
+\textbf{Complejidad Espacial:} $\mathcal{O}(N)$, debido a la memoria requerida por la pila de llamadas (Call Stack).
+
+\subsection{Ejercicio de Práctica en LeetCode}
+\textbf{Nombre:} Fibonacci Number \\
+\textbf{Número:} 509 \\
+\textbf{Dificultad:} Fácil \\
+\textbf{Link:} \url{https://leetcode.com/problems/fibonacci-number/} \\
+\textbf{Complejidad Esperada:} $\mathcal{O}(2^N)$ (aproximación ingenua por recursión múltiple sin optimizar).
+
+\newpage
+\section{Memoización}
+\subsection{Explicación Técnica}
+La memoización es una técnica de optimización (parte de la Programación Dinámica en su enfoque \textit{Top-Down}) que consiste en almacenar los resultados de las llamadas a funciones costosas y devolver el resultado en caché cuando ocurren los mismos inputs nuevamente. Se usa mucho junto a la recursividad para evitar la explosión combinatoria de subproblemas repetidos.
+
+\subsection{Diagrama de Flujo con Caché}
+\begin{center}
+\begin{tikzpicture}[node distance=2cm, >={Stealth}]
+    \node[draw, rectangle, rounded corners, fill=green!10] (start) {Llamada $F(n)$};
+    \node[draw, diamond, aspect=2, below=of start, fill=yellow!10] (check) {¿En caché?};
+    \node[draw, rectangle, right=of check, fill=blue!10] (return) {Retornar valor};
+    \node[draw, rectangle, below=of check, fill=red!10] (calc) {Calcular recursión};
+    \node[draw, rectangle, below=of calc, fill=purple!10] (save) {Guardar en caché};
+    
+    \draw[->] (start) -- (check);
+    \draw[->] (check) -- node[above] {Sí} (return);
+    \draw[->] (check) -- node[right] {No} (calc);
+    \draw[->] (calc) -- (save);
+\end{tikzpicture}
+\end{center}
+
+\subsection{Ejemplo y Complejidad}
+Ejemplo: Fibonacci optimizado usando un arreglo para almacenar estados ya calculados.
+\begin{lstlisting}[language=Java]
+int[] memo = new int[N + 1];
+public int fib(int n) {
+    if (n <= 1) return n;
+    if (memo[n] != 0) return memo[n]; // Consulta al caché
+    memo[n] = fib(n - 1) + fib(n - 2); // Guardado en caché
+    return memo[n];
+}
+\end{lstlisting}
+\textbf{Complejidad Temporal:} $\mathcal{O}(N)$, ya que cada subproblema único (del $0$ al $N$) se calcula estrictamente una vez. \\
+\textbf{Complejidad Espacial:} $\mathcal{O}(N)$ para el arreglo de memoización más la pila de llamadas.
+
+\subsection{Ejercicio de Práctica en LeetCode}
+\textbf{Nombre:} Climbing Stairs \\
+\textbf{Número:} 70 \\
+\textbf{Dificultad:} Fácil \\
+\textbf{Link:} \url{https://leetcode.com/problems/climbing-stairs/} \\
+\textbf{Complejidad Algorítmica:} Temporal $\mathcal{O}(N)$, Espacial $\mathcal{O}(N)$ (o $\mathcal{O}(1)$ si se usan dos variables).
+
+\newpage
+\section{Dividir y Conquistar (Divide and Conquer)}
+\subsection{Explicación Técnica}
+Es un paradigma de diseño de algoritmos que consiste en tres pasos fundamentales:
+\begin{enumerate}
+    \item \textbf{Dividir} el problema en subproblemas más pequeños e independientes.
+    \item \textbf{Conquistar} (resolver) los subproblemas recursivamente. Si el subproblema es lo suficientemente pequeño, se resuelve directamente (caso base).
+    \item \textbf{Combinar} las soluciones de los subproblemas para formar la solución al problema original grande.
+\end{enumerate}
+
+\subsection{Diagrama de Componentes del Algoritmo}
+\begin{center}
+\begin{tikzpicture}[node distance=1.5cm, >={Stealth}]
+    \node[draw, rectangle, text width=3.5cm, align=center, fill=orange!10] (prob) {Problema de tamaño $N$};
+    \node[draw, rectangle, text width=2.8cm, align=center, below left=of prob, fill=yellow!10] (sub1) {Subproblema $N/2$};
+    \node[draw, rectangle, text width=2.8cm, align=center, below right=of prob, fill=yellow!10] (sub2) {Subproblema $N/2$};
+    \node[draw, rectangle, text width=3.5cm, align=center, below=3cm of prob, fill=green!10] (sol) {Solución combinada};
+    
+    \draw[->] (prob) -- node[left] {Dividir } (sub1);
+    \draw[->] (prob) -- node[right] { Dividir} (sub2);
+    \draw[->] (sub1) -- node[left] {Conquistar \& Combinar } (sol);
+    \draw[->] (sub2) -- node[right] { Conquistar \& Combinar} (sol);
+\end{tikzpicture}
+\end{center}
+
+\subsection{Ejemplo y Complejidad}
+Al aplicar Dividir y Conquistar partiendo a la mitad, usualmente llegamos a algoritmos muy eficientes, calculables por el Teorema Maestro (Master Theorem).
+\textbf{Complejidad Temporal típica:} Suelen ser $\mathcal{O}(N \log N)$ (ej. Merge Sort) o $\mathcal{O}(\log N)$ (ej. Búsqueda Binaria).
+
+\subsection{Ejercicio de Práctica en LeetCode}
+\textbf{Nombre:} Convert Sorted Array to Binary Search Tree \\
+\textbf{Número:} 108 \\
+\textbf{Dificultad:} Fácil \\
+\textbf{Link:} \url{https://leetcode.com/problems/convert-sorted-array-to-binary-search-tree/} \\
+\textbf{Complejidad Algorítmica:} $\mathcal{O}(N)$ temporal, porque visitamos cada nodo (elemento del arreglo) una vez para construir el árbol.
+
+\newpage
+\section{Merge Sort}
+\subsection{Explicación Técnica}
+Merge Sort es un algoritmo de ordenamiento que implementa directamente el paradigma de Dividir y Conquistar. Divide recursivamente el arreglo en dos mitades hasta llegar a arreglos triviales de tamaño 1 (los cuales están ordenados por definición). Luego, combina (\textit{merge}) de forma ordenada las mitades adyacentes hasta reconstruir el arreglo completo.
+
+\subsection{Diagrama de Fase de División}
+\begin{center}
+\begin{tikzpicture}[
+    level distance=1.2cm,
+    level 1/.style={sibling distance=4cm},
+    level 2/.style={sibling distance=2cm},
+    every node/.style={draw, rectangle, fill=blue!5}
+]
+\node {[38, 27, 43, 3]}
+    child {node {[38, 27]}
+        child {node {[38]}}
+        child {node {[27]}}
+    }
+    child {node {[43, 3]}
+        child {node {[43]}}
+        child {node {[3]}}
+    };
+\end{tikzpicture}
+\end{center}
+\textit{Diagrama: Recursión de división en Merge Sort. El paso inverso realiza la intercalación ordenada (Merge).}
+
+\subsection{Ejemplo y Complejidad}
+El proceso de intercalar (\textit{merge}) dos arreglos ordenados toma tiempo lineal. La profundidad del árbol de recursión es logarítmica.
+\textbf{Complejidad Temporal:} $\mathcal{O}(N \log N)$ en todos los casos (peor, mejor y promedio). \\
+\textbf{Complejidad Espacial:} $\mathcal{O}(N)$ porque requiere espacio auxiliar (un arreglo temporal) para hacer la mezcla (\textit{merge}).
+
+\subsection{Ejercicio de Práctica en LeetCode}
+\textbf{Nombre:} Merge Sorted Array \\
+\textbf{Número:} 88 \\
+\textbf{Dificultad:} Fácil \\
+\textbf{Link:} \url{https://leetcode.com/problems/merge-sorted-array/} \\
+\textbf{Complejidad Algorítmica:} $\mathcal{O}(M + N)$ al mezclar dos arreglos de tamaños $M$ y $N$. Este es el paso core de la conquista en un Merge Sort.
+
+\newpage
+\section{Búsqueda Binaria (Binary Search)}
+\subsection{Explicación Técnica}
+Es un algoritmo de búsqueda altamente eficiente que encuentra la posición de un valor objetivo dentro de un arreglo \textbf{previamente ordenado}. Funciona comparando el valor objetivo con el elemento del medio del arreglo; si no son iguales, elimina la mitad del espacio en la que el objetivo no puede estar y repite la búsqueda en la mitad restante, actualizando punteros.
+
+\subsection{Diagrama de Punteros}
+\begin{center}
+\begin{tikzpicture}[every node/.style={draw, minimum width=1cm, minimum height=1cm, fill=white}]
+    \node (n1) at (0,0) {1};
+    \node (n2) at (1,0) {3};
+    \node (n3) at (2,0) {5};
+    \node[fill=blue!20] (n4) at (3,0) {7};
+    \node (n5) at (4,0) {9};
+    \node (n6) at (5,0) {11};
+    
+    \node[draw=none, below=0.5cm of n1] (L) {\textbf{Left (L)}};
+    \node[draw=none, below=0.5cm of n4] (M) {\textbf{Mid (M)}};
+    \node[draw=none, below=0.5cm of n6] (R) {\textbf{Right (R)}};
+    
+    \draw[->, thick, shorten >=2pt] (L) -- (n1);
+    \draw[->, thick, shorten >=2pt] (M) -- (n4);
+    \draw[->, thick, shorten >=2pt] (R) -- (n6);
+\end{tikzpicture}
+\end{center}
+\textit{Búsqueda Binaria evaluando el elemento central (M). Dependiendo del valor, L avanza a M+1 o R retrocede a M-1.}
+
+\subsection{Ejemplo y Complejidad}
+Al reducir a la mitad el espacio de búsqueda en cada iteración, el crecimiento es logarítmico.
+\begin{lstlisting}[language=Java]
+int left = 0, right = arr.length - 1;
+while(left <= right) {
+    int mid = left + (right - left) / 2;
+    if(arr[mid] == target) return mid;
+    if(arr[mid] < target) left = mid + 1; // Descartar izquierda
+    else right = mid - 1; // Descartar derecha
+}
+\end{lstlisting}
+\textbf{Complejidad Temporal:} $\mathcal{O}(\log N)$, muy superior al $\mathcal{O}(N)$ de la búsqueda lineal. \\
+\textbf{Complejidad Espacial:} $\mathcal{O}(1)$ en su versión iterativa.
+
+\subsection{Ejercicio de Práctica en LeetCode}
+\textbf{Nombre:} Binary Search \\
+\textbf{Número:} 704 \\
+\textbf{Dificultad:} Fácil \\
+\textbf{Link:} \url{https://leetcode.com/problems/binary-search/} \\
+\textbf{Complejidad Algorítmica:} $\mathcal{O}(\log N)$.
+
+\newpage
+\section{Listas Enlazadas (Linked Lists)}
+\subsection{Explicación Técnica}
+Es una estructura de datos lineal compuesta de nodos. A diferencia de un arreglo convencional, los elementos no se almacenan en ubicaciones contiguas de memoria. En una lista enlazada simple, cada nodo contiene dos componentes: el \textbf{dato} (valor) y un \textbf{puntero} (o referencia) al siguiente nodo en la secuencia. El último nodo apunta a \texttt{NULL}.
+
+\subsection{Diagrama de Clase y Objetos}
+\begin{center}
+\begin{tikzpicture}[
+    listnode/.style={
+        rectangle split, rectangle split parts=2,
+        draw, rectangle split horizontal, fill=gray!10
+    },
+    >={Stealth}
+]
+    % Clase UML Node
+    \node[draw, rectangle, text width=3cm, align=center, at={(1, 3)}, fill=white] (class) {
+        \textbf{<<Class>>}\\ \textbf{ListNode}\\
+        \rule{2.8cm}{0.4pt}\\
+        + val: int \\
+        + next: ListNode \\
+    };
+
+    % Nodos
+    \node[listnode] (A) at (-2, 0) {1 \nodepart{two} \phantom{x}};
+    \node[listnode] (B) at (1, 0) {2 \nodepart{two} \phantom{x}};
+    \node[listnode] (C) at (4, 0) {3 \nodepart{two} \phantom{x}};
+    \node[draw=none, right=1cm of C] (null) {NULL};
+    
+    \draw[{Circle[scale=0.8]}-{Stealth}] (A.two) -- (B);
+    \draw[{Circle[scale=0.8]}-{Stealth}] (B.two) -- (C);
+    \draw[{Circle[scale=0.8]}-{Stealth}] (C.two) -- (null);
+\end{tikzpicture}
+\end{center}
+\textit{Arriba: Diagrama de Clase UML estático. Abajo: Representación dinámica en memoria de los objetos encadenados.}
+
+\subsection{Ejemplo y Complejidad}
+Las listas enlazadas destacan por la eficiencia al insertar elementos si ya se tiene la referencia.
+\begin{itemize}
+    \item \textbf{Inserción / Eliminación al inicio:} $\mathcal{O}(1)$, solo requiere reasignar referencias.
+    \item \textbf{Búsqueda (Acceso por índice):} $\mathcal{O}(N)$, se requiere atravesar nodo a nodo desde la cabeza (\textit{head}).
+\end{itemize}
+
+\subsection{Ejercicio de Práctica en LeetCode}
+\textbf{Nombre:} Reverse Linked List \\
+\textbf{Número:} 206 \\
+\textbf{Dificultad:} Fácil \\
+\textbf{Link:} \url{https://leetcode.com/problems/reverse-linked-list/} \\
+\textbf{Complejidad Algorítmica:} Temporal $\mathcal{O}(N)$ al recorrer los nodos una vez; Espacial $\mathcal{O}(1)$ al redirigir los punteros de manera local (\textit{in-place}).
+
+\end{document}
