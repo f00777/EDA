@@ -1,0 +1,188 @@
+\documentclass{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{color}
+
+% Colors
+\definecolor{myblue}{RGB}{0, 0, 150} % Dark blue for text
+\setbeamercolor{background canvas}{bg=white}
+\setbeamercolor{normal text}{fg=myblue}
+\setbeamercolor{frametitle}{fg=myblue}
+\setbeamercolor{title}{fg=myblue}
+\setbeamercolor{itemize item}{fg=myblue}
+\setbeamercolor{itemize subitem}{fg=myblue}
+
+% Listings config for Java
+\lstset{
+  language=Java,
+  basicstyle=\ttfamily\footnotesize\color{myblue},
+  keywordstyle=\bfseries\color{blue},
+  stringstyle=\color{cyan},
+  commentstyle=\color{gray},
+  showstringspaces=false
+}
+
+\title{Ayudantía [7 Oct]}
+\date{}
+\author{}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% --- Section: Ordenamiento en Java ---
+\section{Librería Estándar de Java para Ordenar}
+
+\begin{frame}{¿Qué es el ordenamiento en Java?}
+  \begin{itemize}
+      \item Java provee interfaces estándar para definir cómo se deben comparar y ordenar los objetos.
+      \item Las principales son \texttt{Comparable}, \texttt{Comparator} y \texttt{Collator}.
+      \item Permiten usar métodos como \texttt{Collections.sort()} o \texttt{Arrays.sort()} fácilmente.
+  \end{itemize}
+  \vspace{0.5cm}
+  \centering
+  \begin{tikzpicture}
+    \node[draw, rounded corners, align=center, text=myblue, draw=myblue] at (0,0) {Objetos \\ Desordenados};
+    \draw[->, thick, myblue] (1.5,0) -- (3,0) node[midway, above] {\footnotesize \texttt{sort()}};
+    \node[draw, rounded corners, align=center, text=myblue, draw=myblue] at (4.5,0) {Objetos \\ Ordenados};
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}{\texttt{Comparable} y \texttt{Comparator}: Concepto}
+  \textbf{Comparable:}
+  \begin{itemize}
+      \item Define el orden "natural" de los objetos de una clase.
+      \item La clase misma debe implementar la interfaz.
+  \end{itemize}
+  \vspace{0.3cm}
+  \textbf{Comparator:}
+  \begin{itemize}
+      \item Define un orden externo.
+      \item Útil para ordenar de múltiples formas o clases que no podemos modificar.
+  \end{itemize}
+  \vspace{0.3cm}
+  \textbf{Collator:}
+  \begin{itemize}
+      \item Especializado en Strings. Considera reglas específicas de idioma (acentos, ñ, etc).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Definición: \texttt{Comparable} (Java)}
+\begin{lstlisting}
+public interface Comparable<T> {
+    /**
+     * Compara este objeto con el objeto especificado.
+     * Retorna:
+     * Un entero negativo, cero, o un entero positivo 
+     * si este objeto es menor, igual, o mayor que 
+     * el objeto especificado.
+     */
+    public int compareTo(T o);
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Definición: \texttt{Comparator} (Java)}
+\begin{lstlisting}
+public interface Comparator<T> {
+    /**
+     * Compara sus dos argumentos para el orden.
+     * Retorna:
+     * Un entero negativo, cero, o un entero positivo
+     * si el primer argumento es menor, igual, o mayor 
+     * que el segundo.
+     */
+    int compare(T o1, T o2);
+}
+\end{lstlisting}
+\end{frame}
+
+
+% --- Section: Árboles Binarios ---
+\section{Árboles Binarios}
+
+\begin{frame}[fragile]{Árboles Binarios: Definición}
+  Un árbol binario es una estructura de datos jerárquica no lineal.
+  \begin{itemize}
+      \item Está compuesto de \textbf{nodos}.
+      \item Cada nodo contiene un valor y referencias a como máximo dos hijos: el \textbf{hijo izquierdo} y el \textbf{hijo derecho}.
+      \item El nodo superior se llama \textbf{raíz}.
+      \item Los nodos sin hijos se llaman \textbf{hojas}.
+  \end{itemize}
+  \vspace{0.3cm}
+  \centering
+  \begin{tikzpicture}[level/.style={sibling distance=30mm/#1}, every node/.style={text=myblue, draw=myblue}]
+    \node [circle,draw] (z){A}
+      child {node [circle,draw] (a) {B}
+        child {node [circle,draw] (b) {D}}
+        child {node [circle,draw] (g) {E}}
+      }
+      child {node [circle,draw] (j) {C}
+        child {node [circle,draw] (k) {F}}
+        child[missing] {}
+      };
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Árbol Binario de Búsqueda (BST)}
+  Un tipo especial de árbol binario que facilita la búsqueda rápida.
+  \vspace{0.3cm}\\
+  \textbf{Propiedades:}
+  \begin{itemize}
+      \item El subárbol izquierdo de un nodo solo contiene nodos con claves \textbf{menores} que la clave del nodo.
+      \item El subárbol derecho de un nodo solo contiene nodos con claves \textbf{mayores} que la clave del nodo.
+      \item Tanto el subárbol izquierdo como el derecho deben ser también árboles binarios de búsqueda.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Búsqueda en BST: Pseudocódigo}
+\begin{verbatim}
+Función Buscar(nodo, valor):
+    Si nodo es Nulo O nodo.valor == valor:
+        Retornar nodo
+    
+    Si valor < nodo.valor:
+        Retornar Buscar(nodo.izquierdo, valor)
+    
+    Sino:
+        Retornar Buscar(nodo.derecho, valor)
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]{Estructura del Nodo en Java}
+\begin{lstlisting}
+class Nodo {
+    int valor;
+    Nodo izquierdo;
+    Nodo derecho;
+
+    public Nodo(int valor) {
+        this.valor = valor;
+        this.izquierdo = null;
+        this.derecho = null;
+    }
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Búsqueda en BST: Java}
+\begin{lstlisting}
+public Nodo buscar(Nodo raiz, int valorBuscado) {
+    if (raiz == null || raiz.valor == valorBuscado) {
+        return raiz;
+    }
+
+    if (valorBuscado < raiz.valor) {
+        return buscar(raiz.izquierdo, valorBuscado);
+    } else {
+        return buscar(raiz.derecho, valorBuscado);
+    }
+}
+\end{lstlisting}
+\end{frame}
+
+\end{document}
