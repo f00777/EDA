@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TreeSet Visualizer - Árbol Rojo-Negro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: 'Inter', sans-serif; color: #f8fafc; }
+        #canvas-container { position: relative; width: 100vw; height: calc(100vh - 135px); background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 100%); }
+        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body class="flex flex-col h-screen select-none">
+
+    <!-- Top Control Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 shadow-lg z-20 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+                <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+                <h1 class="font-bold text-xl text-white tracking-wide">TreeSet</h1>
+            </div>
+            <span class="text-xs bg-slate-800 text-blue-400 px-2 py-0.5 rounded border border-blue-900/50 font-medium">Árbol Rojo-Negro Automático</span>
+        </div>
+
+        <!-- Action Inputs & Buttons -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <input type="number" id="inputValue" placeholder="Valor (Int)" 
+                   class="bg-slate-800 border border-slate-700 text-white placeholder-slate-400 text-sm rounded-lg px-3 py-1.5 w-28 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                   onkeydown="if(event.key==='Enter') insertNode()">
+            
+            <button id="btnInsert" onclick="insertNode()" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition shadow-md hover:shadow-blue-500/25 active:scale-95">
+                + Insertar
+            </button>
+            <button id="btnDelete" onclick="deleteNode()" class="bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition shadow-md hover:shadow-rose-500/25 active:scale-95">
+                - Eliminar
+            </button>
+            <button id="btnSearch" onclick="searchNode()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition shadow-md hover:shadow-emerald-500/25 active:scale-95">
+                Buscar
+            </button>
+
+            <!-- NavigableSet Quick Actions -->
+            <div class="h-6 w-px bg-slate-700 mx-1"></div>
+            <button onclick="getExtremes('first')" title="first()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">first()</button>
+            <button onclick="getExtremes('last')" title="last()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">last()</button>
+            <button onclick="loadExample()" class="bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs px-2.5 py-1.5 rounded transition shadow border border-indigo-500/40" title="Carga el ejemplo de la ayudantía: 10, 20, 30, 15, 25, 12">
+                Ejemplo Ayudantía
+            </button>
+            <button onclick="clearTree()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">
+                Limpiar
+            </button>
+        </div>
+
+        <!-- Live Statistics -->
+        <div class="flex items-center gap-4 text-xs font-mono text-slate-400">
+            <div>Nodos: <span id="statSize" class="text-white font-bold">0</span></div>
+            <div>Altura Negra: <span id="statBh" class="text-white font-bold">0</span></div>
+            <div class="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded">
+                <span>✓</span> Balanceado
+            </div>
+        </div>
+    </header>
+
+    <!-- Sub-bar: Status and Rebalancing Steps Log -->
+    <div class="bg-slate-950/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between text-xs gap-4 z-10">
+        <div class="flex items-center gap-2 overflow-hidden">
+            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0">Operación:</span>
+            <div id="message" class="text-slate-200 font-medium truncate">Árbol vacío. Inserta elementos para comenzar.</div>
+        </div>
+        <!-- Legend -->
+        <div class="flex items-center gap-3 shrink-0 text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 border border-red-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span> Nodo Rojo</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-slate-900 border border-slate-600"></span> Nodo Negro</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"></span> Encontrado</span>
+            <span class="text-slate-500 italic hidden sm:inline">(Clic en un nodo para eliminar)</span>
+        </div>
+    </div>
+
+    <!-- Canvas -->
+    <div id="canvas-container">
+        <canvas id="treeCanvas"></canvas>
+    </div>
+
+<script>
+    const canvas = document.getElementById('treeCanvas');
+    const ctx = canvas.getContext('2d');
+    const msgEl = document.getElementById('message');
+    const statSize = document.getElementById('statSize');
+    const statBh = document.getElementById('statBh');
+
+    let renderedNodes = [];
+
+    function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+        draw();
+    }
+    window.addEventListener('resize', resize);
+
+    // =========================================================================
+    // ÁRBOL ROJO-NEGRO (Red-Black Tree) IDÉNTICO A java.util.TreeMap / TreeSet
+    // =========================================================================
+    const RED = true;
+    const BLACK = false;
+
+    class Node {
+        constructor(value) {
+            this.value = value;
+            this.color = RED; // Los nuevos nodos entran siempre ROJOS
+            this.left = null;
+            this.right = null;
+            this.parent = null;
+            this.x = 0;
+            this.y = 0;
+            this.depth = 0;
+            this.highlight = 0; // 0: normal, 1: encontrado, 2: nuevo
+        }
+    }
+
+    class TreeSet {
+        constructor() {
+            this.root = null;
+            this.size = 0;
+        }
+
+        colorOf(p) { return p ? p.color : BLACK; }
+        parentOf(p) { return p ? p.parent : null; }
+        leftOf(p) { return p ? p.left : null; }
+        rightOf(p) { return p ? p.right : null; }
+        setColor(p, c) { if (p) p.color = c; }
+
+        rotateLeft(p) {
+            if (!p) return;
+            const r = p.right;
+            p.right = r.left;
+            if (r.left !== null) r.left.parent = p;
+            r.parent = p.parent;
+            if (p.parent === null) this.root = r;
+            else if (p.parent.left === p) p.parent.left = r;
+            else p.parent.right = r;
+            r.left = p;
+            p.parent = r;
+        }
+
+        rotateRight(p) {
+            if (!p) return;
+            const l = p.left;
+            p.left = l.right;
+            if (l.right !== null) l.right.parent = p;
+            l.parent = p.parent;
+            if (p.parent === null) this.root = l;
+            else if (p.parent.right === p) p.parent.right = l;
+            else p.parent.left = l;
+            l.right = p;
+            p.parent = l;
+        }
+
+        insert(value) {
+            if (!Number.isInteger(value)) {
+                return { ok: false, msg: "Ingresa un número entero válido" };
+            }
+            let t = this.root;
+            if (!t) {
+                this.root = new Node(value);
+                this.root.color = BLACK; // La raíz siempre es negra
+                this.root.highlight = 2;
+                this.size = 1;
+                return { 
+                    ok: true, 
+                    msg: `Insertado ${value} como raíz (negra). Rebalanceo automático: sin violaciones.`
+                };
+            }
+
+            let parent = null;
+            let cmp = 0;
+            while (t !== null) {
+                parent = t;
+                cmp = value - t.value;
+                if (cmp < 0) t = t.left;
+                else if (cmp > 0) t = t.right;
+                else {
+                    return { ok: false, msg: `El valor ${value} ya existe (TreeSet no admite duplicados)` };
+                }
+            }
+
+            const e = new Node(value);
+            e.parent = parent;
+            e.highlight = 2;
+            if (cmp < 0) parent.left = e;
+            else parent.right = e;
+            this.size++;
+
+            // Rebalanceo automático
+            const steps = this.fixAfterInsertion(e);
+            const stepMsg = steps.length > 0 ? ` [Rebalanceo automático: ${steps.join(" → ")}]` : ` [Padre negro: sin violación]`;
+            return { ok: true, msg: `Insertado ${value}.${stepMsg}` };
+        }
+
+        fixAfterInsertion(x) {
+            x.color = RED;
+            const steps = [];
+
+            while (x !== null && x !== this.root && x.parent.color === RED) {
+                if (this.parentOf(x) === this.leftOf(this.parentOf(this.parentOf(x)))) {
+                    let y = this.rightOf(this.parentOf(this.parentOf(x))); // tío
+                    if (this.colorOf(y) === RED) {
+                        steps.push(`Caso 1: Tío ${y.value} rojo → recolorear padre, tío y abuelo`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(y, BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        x = this.parentOf(this.parentOf(x));
+                    } else {
+                        if (x === this.rightOf(this.parentOf(x))) {
+                            steps.push(`Caso 2: Triángulo → rotar IZQ en ${x.parent.value}`);
+                            x = this.parentOf(x);
+                            this.rotateLeft(x);
+                        }
+                        steps.push(`Caso 3: Línea → recolorear y rotar DER en ${this.parentOf(this.parentOf(x)).value}`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        this.rotateRight(this.parentOf(this.parentOf(x)));
+                    }
+                } else { // Simétrico
+                    let y = this.leftOf(this.parentOf(this.parentOf(x))); // tío
+                    if (this.colorOf(y) === RED) {
+                        steps.push(`Caso 1: Tío ${y.value} rojo → recolorear padre, tío y abuelo`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(y, BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        x = this.parentOf(this.parentOf(x));
+                    } else {
+                        if (x === this.leftOf(this.parentOf(x))) {
+                            steps.push(`Caso 2: Triángulo → rotar DER en ${x.parent.value}`);
+                            x = this.parentOf(x);
+                            this.rotateRight(x);
+                        }
+                        steps.push(`Caso 3: Línea → recolorear y rotar IZQ en ${this.parentOf(this.parentOf(x)).value}`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        this.rotateLeft(this.parentOf(this.parentOf(x)));
+                    }
+                }
+            }
+            if (this.root.color === RED) {
+                steps.push(`Raíz ${this.root.value} se fija en negro`);
+            }
+            this.root.color = BLACK;
+            return steps;
+        }
+
+        delete(value) {
+            if (!Number.isInteger(value)) return { ok: false, msg: "Valor no válido" };
+            let p = this.getNode(value);
+            if (!p) return { ok: false, msg: `El valor ${value} no está en el conjunto` };
+
+            const steps = [];
+            this.size--;
+
+            // Caso 2 hijos: reemplazar por sucesor inorden
+            if (p.left !== null && p.right !== null) {
+                let s = this.successor(p);
+                steps.push(`2 hijos: copiado sucesor ${s.value} en nodo ${p.value}`);
+                p.value = s.value;
+                p = s;
+            }
+
+            let replacement = (p.left !== null ? p.left : p.right);
+
+            if (replacement !== null) { // Caso 1 hijo
+                steps.push(`1 hijo (${replacement.value}): toma el lugar del nodo`);
+                replacement.parent = p.parent;
+                if (p.parent === null) this.root = replacement;
+                else if (p === p.parent.left) p.parent.left = replacement;
+                else p.parent.right = replacement;
+
+                p.left = p.right = p.parent = null;
+
+                if (p.color === BLACK) {
+                    steps.push(...this.fixAfterDeletion(replacement));
+                }
+            } else if (p.parent === null) { // Era el único nodo
+                steps.push(`Árbol quedó vacío`);
+                this.root = null;
+            } else { // Caso hoja
+                if (p.color === BLACK) {
+                    steps.push(`Hoja negra: genera 'doble negro'`);
+                    steps.push(...this.fixAfterDeletion(p));
+                } else {
+                    steps.push(`Hoja roja: eliminada sin necesidad de rotaciones`);
+                }
+
+                if (p.parent !== null) {
+                    if (p === p.parent.left) p.parent.left = null;
+                    else if (p === p.parent.right) p.parent.right = null;
+                    p.parent = null;
+                }
+            }
+
+            const stepMsg = steps.length > 0 ? ` [Rebalanceo: ${steps.join(" → ")}]` : "";
+            return { ok: true, msg: `Eliminado ${value}.${stepMsg}` };
+        }
+
+        fixAfterDeletion(x) {
+            const steps = [];
+            while (x !== this.root && this.colorOf(x) === BLACK) {
+                if (x === this.leftOf(this.parentOf(x))) {
+                    let sib = this.rightOf(this.parentOf(x));
+
+                    if (this.colorOf(sib) === RED) {
+                        steps.push(`Caso 1: Hermano ${sib.value} rojo → recolorear y rotar IZQ en padre`);
+                        this.setColor(sib, BLACK);
+                        this.setColor(this.parentOf(x), RED);
+                        this.rotateLeft(this.parentOf(x));
+                        sib = this.rightOf(this.parentOf(x));
+                    }
+
+                    if (this.colorOf(this.leftOf(sib)) === BLACK && this.colorOf(this.rightOf(sib)) === BLACK) {
+                        steps.push(`Caso 2: Hermano con sobrinos negros → hermano a rojo, subir déficit`);
+                        this.setColor(sib, RED);
+                        x = this.parentOf(x);
+                    } else {
+                        if (this.colorOf(this.rightOf(sib)) === BLACK) {
+                            steps.push(`Caso 3: Sobrino lejano negro → rotar DER en hermano ${sib.value}`);
+                            this.setColor(this.leftOf(sib), BLACK);
+                            this.setColor(sib, RED);
+                            this.rotateRight(sib);
+                            sib = this.rightOf(this.parentOf(x));
+                        }
+                        steps.push(`Caso 4: Sobrino lejano rojo → recolorear y rotar IZQ en padre`);
+                        this.setColor(sib, this.colorOf(this.parentOf(x)));
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.rightOf(sib), BLACK);
+                        this.rotateLeft(this.parentOf(x));
+                        x = this.root;
+                    }
+                } else { // Simétrico
+                    let sib = this.leftOf(this.parentOf(x));
+
+                    if (this.colorOf(sib) === RED) {
+                        steps.push(`Caso 1: Hermano ${sib.value} rojo → recolorear y rotar DER en padre`);
+                        this.setColor(sib, BLACK);
+                        this.setColor(this.parentOf(x), RED);
+                        this.rotateRight(this.parentOf(x));
+                        sib = this.leftOf(this.parentOf(x));
+                    }
+
+                    if (this.colorOf(this.rightOf(sib)) === BLACK && this.colorOf(this.leftOf(sib)) === BLACK) {
+                        steps.push(`Caso 2: Hermano con sobrinos negros → hermano a rojo, subir déficit`);
+                        this.setColor(sib, RED);
+                        x = this.parentOf(x);
+                    } else {
+                        if (this.colorOf(this.leftOf(sib)) === BLACK) {
+                            steps.push(`Caso 3: Sobrino lejano negro → rotar IZQ en hermano ${sib.value}`);
+                            this.setColor(this.rightOf(sib), BLACK);
+                            this.setColor(sib, RED);
+                            this.rotateLeft(sib);
+                            sib = this.leftOf(this.parentOf(x));
+                        }
+                        steps.push(`Caso 4: Sobrino lejano rojo → recolorear y rotar DER en padre`);
+                        this.setColor(sib, this.colorOf(this.parentOf(x)));
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.leftOf(sib), BLACK);
+                        this.rotateRight(this.parentOf(x));
+                        x = this.root;
+                    }
+                }
+            }
+            this.setColor(x, BLACK);
+            return steps;
+        }
+
+        getNode(val) {
+            let p = this.root;
+            while (p !== null) {
+                let cmp = val - p.value;
+                if (cmp < 0) p = p.left;
+                else if (cmp > 0) p = p.right;
+                else return p;
+            }
+            return null;
+        }
+
+        successor(t) {
+            if (!t) return null;
+            if (t.right !== null) {
+                let p = t.right;
+                while (p.left !== null) p = p.left;
+                return p;
+            }
+            let p = t.parent;
+            let ch = t;
+            while (p !== null && ch === p.right) {
+                ch = p;
+                p = p.parent;
+            }
+            return p;
+        }
+
+        first() {
+            if (!this.root) return null;
+            let p = this.root;
+            while (p.left) p = p.left;
+            return p;
+        }
+
+        last() {
+            if (!this.root) return null;
+            let p = this.root;
+            while (p.right) p = p.right;
+            return p;
+        }
+
+        getBlackHeight() {
+            if (!this.root) return 0;
+            let count = 0, p = this.root;
+            while (p) {
+                if (p.color === BLACK) count++;
+                p = p.left;
+            }
+            return count + 1; // contando nil
+        }
+
+        resetHighlights(node = this.root) {
+            if (!node) return;
+            node.highlight = 0;
+            this.resetHighlights(node.left);
+            this.resetHighlights(node.right);
+        }
+    }
+
+    const tree = new TreeSet();
+
+    // =========================================================================
+    // DIBUJO Y CÁLCULO DE POSICIONES EN CANVAS
+    // =========================================================================
+    function calcPositions(root, canvasWidth) {
+        if (!root) return [];
+        const order = [];
+        function inOrder(n, depth) {
+            if (!n) return;
+            inOrder(n.left, depth + 1);
+            n.depth = depth;
+            order.push(n);
+            inOrder(n.right, depth + 1);
+        }
+        inOrder(root, 0);
+
+        const N = order.length;
+        const availableW = canvasWidth - 140;
+        const dx = N <= 1 ? 0 : Math.max(46, Math.min(84, availableW / (N - 1)));
+        const totalW = (N - 1) * dx;
+        const startX = Math.max(70, (canvasWidth - totalW) / 2);
+
+        order.forEach((n, idx) => {
+            n.x = startX + idx * dx;
+            n.y = 65 + n.depth * 75;
+        });
+
+        return order;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        renderedNodes = calcPositions(tree.root, canvas.width);
+
+        // Actualizar estadísticas
+        statSize.textContent = tree.size;
+        statBh.textContent = tree.getBlackHeight();
+
+        if (!tree.root) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('El árbol está vacío. Usa "Insertar" o "Ejemplo Ayudantía" arriba.', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        // 1. Dibujar aristas
+        renderedNodes.forEach(n => {
+            if (n.left) drawEdge(n, n.left);
+            if (n.right) drawEdge(n, n.right);
+        });
+
+        // 2. Dibujar nodos
+        renderedNodes.forEach(n => drawNode(n));
+    }
+
+    function drawEdge(parent, child) {
+        ctx.beginPath();
+        ctx.moveTo(parent.x, parent.y);
+        // Curva suave
+        const midY = (parent.y + child.y) / 2;
+        ctx.bezierCurveTo(parent.x, midY, child.x, midY, child.x, child.y);
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    }
+
+    function drawNode(n) {
+        const radius = 22;
+
+        // Halo si está resaltado
+        if (n.highlight === 1) { // Encontrado
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, radius + 8, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.35)';
+            ctx.fill();
+        } else if (n.highlight === 2) { // Recién insertado / modificado
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, radius + 7, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.4)';
+            ctx.fill();
+        }
+
+        // Círculo principal del nodo
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+
+        // Degradado según color Rojo o Negro
+        const grad = ctx.createRadialGradient(n.x - 5, n.y - 5, 2, n.x, n.y, radius);
+        if (n.color === RED) {
+            grad.addColorStop(0, '#f87171');
+            grad.addColorStop(1, '#dc2626');
+            ctx.fillStyle = grad;
+            ctx.strokeStyle = '#ef4444';
+        } else {
+            grad.addColorStop(0, '#334155');
+            grad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = grad;
+            ctx.strokeStyle = '#64748b';
+        }
+        ctx.lineWidth = 2.5;
+        ctx.fill();
+        ctx.stroke();
+
+        // Texto del valor
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 13px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(n.value, n.x, n.y);
+
+        // Pequeño indicador de color (R o N)
+        ctx.fillStyle = n.color === RED ? '#fee2e2' : '#94a3b8';
+        ctx.font = 'bold 8px Inter, sans-serif';
+        ctx.fillText(n.color === RED ? 'R' : 'N', n.x, n.y + 13);
+    }
+
+    // =========================================================================
+    // CONTROLADORES DE INTERFAZ
+    // =========================================================================
+    function showMsg(txt, isError = false) {
+        msgEl.textContent = txt;
+        msgEl.className = isError 
+            ? 'text-rose-400 font-semibold truncate' 
+            : 'text-slate-200 font-medium truncate';
+    }
+
+    function getVal() {
+        const inp = document.getElementById('inputValue');
+        const v = parseInt(inp.value);
+        if (isNaN(v)) return null;
+        return v;
+    }
+
+    function insertNode() {
+        const val = getVal();
+        if (val === null) return showMsg("Por favor ingresa un número entero.", true);
+        tree.resetHighlights();
+        const res = tree.insert(val);
+        draw();
+        showMsg(res.msg, !res.ok);
+        document.getElementById('inputValue').value = '';
+        document.getElementById('inputValue').focus();
+    }
+
+    function deleteNode(valToDelete = null) {
+        const val = valToDelete !== null ? valToDelete : getVal();
+        if (val === null) return showMsg("Ingresa un valor para eliminar.", true);
+        tree.resetHighlights();
+        const res = tree.delete(val);
+        draw();
+        showMsg(res.msg, !res.ok);
+        if (valToDelete === null) document.getElementById('inputValue').value = '';
+    }
+
+    function searchNode() {
+        const val = getVal();
+        if (val === null) return showMsg("Ingresa un valor para buscar.", true);
+        tree.resetHighlights();
+        const n = tree.getNode(val);
+        if (n) {
+            n.highlight = 1;
+            draw();
+            showMsg(`✓ Encontrado: ${val} (Color: ${n.color === RED ? 'ROJO' : 'NEGRO'})`);
+        } else {
+            draw();
+            showMsg(`✗ No encontrado: ${val} no existe en el TreeSet`, true);
+        }
+    }
+
+    function getExtremes(type) {
+        tree.resetHighlights();
+        const n = type === 'first' ? tree.first() : tree.last();
+        if (!n) return showMsg("El árbol está vacío", true);
+        n.highlight = 1;
+        draw();
+        showMsg(`${type}() = ${n.value} (Color: ${n.color === RED ? 'ROJO' : 'NEGRO'})`);
+    }
+
+    function clearTree() {
+        tree.root = null;
+        tree.size = 0;
+        draw();
+        showMsg("Árbol vaciado.");
+    }
+
+    function loadExample() {
+        clearTree();
+        const values = [10, 20, 30, 15, 25, 12];
+        let i = 0;
+        function step() {
+            if (i < values.length) {
+                tree.resetHighlights();
+                const res = tree.insert(values[i]);
+                draw();
+                showMsg(`[Paso ${i+1}/${values.length}] ${res.msg}`);
+                i++;
+                setTimeout(step, 800);
+            } else {
+                showMsg("¡Secuencia de la ayudantía cargada! Observa el balanceo automático y las alturas negras.");
+            }
+        }
+        step();
+    }
+
+    // Clic en canvas para interactuar / eliminar
+    canvas.addEventListener('mousedown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        for (let n of renderedNodes) {
+            if (Math.hypot(n.x - mx, n.y - my) <= 24) {
+                deleteNode(n.value);
+                break;
+            }
+        }
+    });
+
+    resize();
+</script>
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TreeMap Visualizer - Árbol Rojo-Negro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; font-family: 'Inter', sans-serif; color: #f8fafc; }
+        #canvas-container { position: relative; width: 100vw; height: calc(100vh - 135px); background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0f172a 100%); }
+        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body class="flex flex-col h-screen select-none">
+
+    <!-- Top Control Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 shadow-lg z-20 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+                <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+                <h1 class="font-bold text-xl text-white tracking-wide">TreeMap</h1>
+            </div>
+            <span class="text-xs bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded border border-indigo-800/60 font-medium">Map&lt;K,V&gt; Rojo-Negro</span>
+        </div>
+
+        <!-- Action Inputs & Buttons -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <input type="number" id="inputKey" placeholder="Clave (Int)" 
+                   class="bg-slate-800 border border-slate-700 text-white placeholder-slate-400 text-sm rounded-lg px-2.5 py-1.5 w-24 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                   onkeydown="if(event.key==='Enter') document.getElementById('inputVal').focus()">
+            
+            <input type="text" id="inputVal" placeholder="Valor (Str)" 
+                   class="bg-slate-800 border border-slate-700 text-white placeholder-slate-400 text-sm rounded-lg px-2.5 py-1.5 w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                   onkeydown="if(event.key==='Enter') insertNode()">
+
+            <button id="btnPut" onclick="insertNode()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition shadow-md hover:shadow-indigo-500/25 active:scale-95">
+                put(K, V)
+            </button>
+            <button id="btnDelete" onclick="deleteNode()" class="bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition shadow-md hover:shadow-rose-500/25 active:scale-95">
+                remove(K)
+            </button>
+            <button id="btnSearch" onclick="searchNode()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition shadow-md hover:shadow-emerald-500/25 active:scale-95">
+                get(K)
+            </button>
+
+            <!-- NavigableMap Quick Actions -->
+            <div class="h-6 w-px bg-slate-700 mx-1"></div>
+            <button onclick="getExtremes('first')" title="firstKey()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">firstKey()</button>
+            <button onclick="getExtremes('last')" title="lastKey()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">lastKey()</button>
+            <button onclick="runFloorCeiling('floor')" title="floorKey(K)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">floor(K)</button>
+            <button onclick="runFloorCeiling('ceiling')" title="ceilingKey(K)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">ceiling(K)</button>
+            
+            <button onclick="loadExample()" class="bg-purple-600/80 hover:bg-purple-600 text-white text-xs px-2.5 py-1.5 rounded transition shadow border border-purple-500/40" title="Carga el ejemplo de la ayudantía: 20:Ana, 10:Benja, 30:Carla, 15:Diego, 25:Elisa, 12:Fran">
+                Ejemplo Ayudantía
+            </button>
+            <button onclick="clearTree()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs px-2.5 py-1.5 rounded border border-slate-700 transition">
+                Limpiar
+            </button>
+        </div>
+
+        <!-- Live Statistics -->
+        <div class="flex items-center gap-4 text-xs font-mono text-slate-400">
+            <div>Entradas: <span id="statSize" class="text-white font-bold">0</span></div>
+            <div>Altura Negra: <span id="statBh" class="text-white font-bold">0</span></div>
+            <div class="flex items-center gap-1.5 text-indigo-400 bg-indigo-950/60 border border-indigo-800/60 px-2 py-0.5 rounded">
+                <span>✓</span> Balanceado
+            </div>
+        </div>
+    </header>
+
+    <!-- Sub-bar: Status and Rebalancing Steps Log -->
+    <div class="bg-slate-950/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between text-xs gap-4 z-10">
+        <div class="flex items-center gap-2 overflow-hidden">
+            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0">Operación:</span>
+            <div id="message" class="text-slate-200 font-medium truncate">Mapa vacío. Agrega pares [Clave, Valor] para comenzar.</div>
+        </div>
+        <!-- Legend -->
+        <div class="flex items-center gap-3 shrink-0 text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-600 border border-red-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span> Entrada Roja</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-900 border border-slate-600"></span> Entrada Negra</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"></span> Encontrada</span>
+            <span class="text-slate-500 italic hidden sm:inline">(Clic en una tarjeta para eliminar)</span>
+        </div>
+    </div>
+
+    <!-- Canvas Container -->
+    <div id="canvas-container">
+        <canvas id="treeCanvas"></canvas>
+    </div>
+
+<script>
+    const canvas = document.getElementById('treeCanvas');
+    const ctx = canvas.getContext('2d');
+    const msgEl = document.getElementById('message');
+    const statSize = document.getElementById('statSize');
+    const statBh = document.getElementById('statBh');
+
+    let renderedEntries = [];
+
+    function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+        draw();
+    }
+    window.addEventListener('resize', resize);
+
+    // =========================================================================
+    // ÁRBOL ROJO-NEGRO PARA TreeMap (Entry<K,V>)
+    // =========================================================================
+    const RED = true;
+    const BLACK = false;
+
+    class Entry {
+        constructor(key, value) {
+            this.key = key;
+            this.value = value;
+            this.color = RED; // Nuevos nodos entran ROJOS
+            this.left = null;
+            this.right = null;
+            this.parent = null;
+            this.x = 0;
+            this.y = 0;
+            this.depth = 0;
+            this.highlight = 0; // 0: normal, 1: encontrado, 2: nuevo/modificado
+        }
+    }
+
+    class TreeMap {
+        constructor() {
+            this.root = null;
+            this.size = 0;
+        }
+
+        colorOf(p) { return p ? p.color : BLACK; }
+        parentOf(p) { return p ? p.parent : null; }
+        leftOf(p) { return p ? p.left : null; }
+        rightOf(p) { return p ? p.right : null; }
+        setColor(p, c) { if (p) p.color = c; }
+
+        rotateLeft(p) {
+            if (!p) return;
+            const r = p.right;
+            p.right = r.left;
+            if (r.left !== null) r.left.parent = p;
+            r.parent = p.parent;
+            if (p.parent === null) this.root = r;
+            else if (p.parent.left === p) p.parent.left = r;
+            else p.parent.right = r;
+            r.left = p;
+            p.parent = r;
+        }
+
+        rotateRight(p) {
+            if (!p) return;
+            const l = p.left;
+            p.left = l.right;
+            if (l.right !== null) l.right.parent = p;
+            l.parent = p.parent;
+            if (p.parent === null) this.root = l;
+            else if (p.parent.right === p) p.parent.right = l;
+            else p.parent.left = l;
+            l.right = p;
+            p.parent = l;
+        }
+
+        put(key, value) {
+            if (!Number.isInteger(key)) {
+                return { ok: false, msg: "La clave debe ser un número entero válido" };
+            }
+            let t = this.root;
+            if (!t) {
+                this.root = new Entry(key, value);
+                this.root.color = BLACK;
+                this.root.highlight = 2;
+                this.size = 1;
+                return { ok: true, msg: `Insertada clave [${key} : "${value}"] como raíz (negra). Rebalanceo automático: OK.` };
+            }
+
+            let parent = null;
+            let cmp = 0;
+            while (t !== null) {
+                parent = t;
+                cmp = key - t.key;
+                if (cmp < 0) t = t.left;
+                else if (cmp > 0) t = t.right;
+                else {
+                    const oldVal = t.value;
+                    t.value = value;
+                    t.highlight = 2;
+                    return { ok: true, msg: `Clave [${key}] ya existía: valor actualizado de "${oldVal}" a "${value}". (Sin cambios en árbol)` };
+                }
+            }
+
+            const e = new Entry(key, value);
+            e.parent = parent;
+            e.highlight = 2;
+            if (cmp < 0) parent.left = e;
+            else parent.right = e;
+            this.size++;
+
+            // Rebalanceo automático
+            const steps = this.fixAfterInsertion(e);
+            const stepMsg = steps.length > 0 ? ` [Rebalanceo automático: ${steps.join(" → ")}]` : ` [Padre negro: sin violación]`;
+            return { ok: true, msg: `put(${key}, "${value}").${stepMsg}` };
+        }
+
+        fixAfterInsertion(x) {
+            x.color = RED;
+            const steps = [];
+
+            while (x !== null && x !== this.root && x.parent.color === RED) {
+                if (this.parentOf(x) === this.leftOf(this.parentOf(this.parentOf(x)))) {
+                    let y = this.rightOf(this.parentOf(this.parentOf(x))); // tío
+                    if (this.colorOf(y) === RED) {
+                        steps.push(`Caso 1: Tío [${y.key}] rojo → recolorear padre, tío y abuelo`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(y, BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        x = this.parentOf(this.parentOf(x));
+                    } else {
+                        if (x === this.rightOf(this.parentOf(x))) {
+                            steps.push(`Caso 2: Triángulo → rotar IZQ en [${x.parent.key}]`);
+                            x = this.parentOf(x);
+                            this.rotateLeft(x);
+                        }
+                        steps.push(`Caso 3: Línea → recolorear y rotar DER en [${this.parentOf(this.parentOf(x)).key}]`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        this.rotateRight(this.parentOf(this.parentOf(x)));
+                    }
+                } else { // Simétrico
+                    let y = this.leftOf(this.parentOf(this.parentOf(x))); // tío
+                    if (this.colorOf(y) === RED) {
+                        steps.push(`Caso 1: Tío [${y.key}] rojo → recolorear padre, tío y abuelo`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(y, BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        x = this.parentOf(this.parentOf(x));
+                    } else {
+                        if (x === this.leftOf(this.parentOf(x))) {
+                            steps.push(`Caso 2: Triángulo → rotar DER en [${x.parent.key}]`);
+                            x = this.parentOf(x);
+                            this.rotateRight(x);
+                        }
+                        steps.push(`Caso 3: Línea → recolorear y rotar IZQ en [${this.parentOf(this.parentOf(x)).key}]`);
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.parentOf(this.parentOf(x)), RED);
+                        this.rotateLeft(this.parentOf(this.parentOf(x)));
+                    }
+                }
+            }
+            if (this.root.color === RED) {
+                steps.push(`Raíz [${this.root.key}] se fija en negro`);
+            }
+            this.root.color = BLACK;
+            return steps;
+        }
+
+        remove(key) {
+            if (!Number.isInteger(key)) return { ok: false, msg: "Clave no válida" };
+            let p = this.getEntry(key);
+            if (!p) return { ok: false, msg: `Clave [${key}] no encontrada en el TreeMap` };
+
+            const steps = [];
+            const deletedVal = p.value;
+            this.size--;
+
+            // Caso 2 hijos: sucesor
+            if (p.left !== null && p.right !== null) {
+                let s = this.successor(p);
+                steps.push(`2 hijos: copiado sucesor [${s.key}: "${s.value}"] en lugar de [${p.key}]`);
+                p.key = s.key;
+                p.value = s.value;
+                p = s;
+            }
+
+            let replacement = (p.left !== null ? p.left : p.right);
+
+            if (replacement !== null) {
+                steps.push(`1 hijo [${replacement.key}]: toma el lugar de la entrada eliminada`);
+                replacement.parent = p.parent;
+                if (p.parent === null) this.root = replacement;
+                else if (p === p.parent.left) p.parent.left = replacement;
+                else p.parent.right = replacement;
+
+                p.left = p.right = p.parent = null;
+
+                if (p.color === BLACK) {
+                    steps.push(...this.fixAfterDeletion(replacement));
+                }
+            } else if (p.parent === null) {
+                steps.push(`Mapa quedó vacío`);
+                this.root = null;
+            } else {
+                if (p.color === BLACK) {
+                    steps.push(`Hoja negra: genera déficit 'doble negro'`);
+                    steps.push(...this.fixAfterDeletion(p));
+                } else {
+                    steps.push(`Hoja roja: eliminada sin rotaciones`);
+                }
+
+                if (p.parent !== null) {
+                    if (p === p.parent.left) p.parent.left = null;
+                    else if (p === p.parent.right) p.parent.right = null;
+                    p.parent = null;
+                }
+            }
+
+            const stepMsg = steps.length > 0 ? ` [Rebalanceo: ${steps.join(" → ")}]` : "";
+            return { ok: true, msg: `Eliminada clave [${key}] (tenía valor "${deletedVal}").${stepMsg}` };
+        }
+
+        fixAfterDeletion(x) {
+            const steps = [];
+            while (x !== this.root && this.colorOf(x) === BLACK) {
+                if (x === this.leftOf(this.parentOf(x))) {
+                    let sib = this.rightOf(this.parentOf(x));
+
+                    if (this.colorOf(sib) === RED) {
+                        steps.push(`Caso 1: Hermano [${sib.key}] rojo → recolorear y rotar IZQ en padre`);
+                        this.setColor(sib, BLACK);
+                        this.setColor(this.parentOf(x), RED);
+                        this.rotateLeft(this.parentOf(x));
+                        sib = this.rightOf(this.parentOf(x));
+                    }
+
+                    if (this.colorOf(this.leftOf(sib)) === BLACK && this.colorOf(this.rightOf(sib)) === BLACK) {
+                        steps.push(`Caso 2: Hermano con sobrinos negros → hermano a rojo, subir déficit`);
+                        this.setColor(sib, RED);
+                        x = this.parentOf(x);
+                    } else {
+                        if (this.colorOf(this.rightOf(sib)) === BLACK) {
+                            steps.push(`Caso 3: Sobrino lejano negro → rotar DER en hermano [${sib.key}]`);
+                            this.setColor(this.leftOf(sib), BLACK);
+                            this.setColor(sib, RED);
+                            this.rotateRight(sib);
+                            sib = this.rightOf(this.parentOf(x));
+                        }
+                        steps.push(`Caso 4: Sobrino lejano rojo → recolorear y rotar IZQ en padre`);
+                        this.setColor(sib, this.colorOf(this.parentOf(x)));
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.rightOf(sib), BLACK);
+                        this.rotateLeft(this.parentOf(x));
+                        x = this.root;
+                    }
+                } else {
+                    let sib = this.leftOf(this.parentOf(x));
+
+                    if (this.colorOf(sib) === RED) {
+                        steps.push(`Caso 1: Hermano [${sib.key}] rojo → recolorear y rotar DER en padre`);
+                        this.setColor(sib, BLACK);
+                        this.setColor(this.parentOf(x), RED);
+                        this.rotateRight(this.parentOf(x));
+                        sib = this.leftOf(this.parentOf(x));
+                    }
+
+                    if (this.colorOf(this.rightOf(sib)) === BLACK && this.colorOf(this.leftOf(sib)) === BLACK) {
+                        steps.push(`Caso 2: Hermano con sobrinos negros → hermano a rojo, subir déficit`);
+                        this.setColor(sib, RED);
+                        x = this.parentOf(x);
+                    } else {
+                        if (this.colorOf(this.leftOf(sib)) === BLACK) {
+                            steps.push(`Caso 3: Sobrino lejano negro → rotar IZQ en hermano [${sib.key}]`);
+                            this.setColor(this.rightOf(sib), BLACK);
+                            this.setColor(sib, RED);
+                            this.rotateLeft(sib);
+                            sib = this.leftOf(this.parentOf(x));
+                        }
+                        steps.push(`Caso 4: Sobrino lejano rojo → recolorear y rotar DER en padre`);
+                        this.setColor(sib, this.colorOf(this.parentOf(x)));
+                        this.setColor(this.parentOf(x), BLACK);
+                        this.setColor(this.leftOf(sib), BLACK);
+                        this.rotateRight(this.parentOf(x));
+                        x = this.root;
+                    }
+                }
+            }
+            this.setColor(x, BLACK);
+            return steps;
+        }
+
+        getEntry(k) {
+            let p = this.root;
+            while (p !== null) {
+                let cmp = k - p.key;
+                if (cmp < 0) p = p.left;
+                else if (cmp > 0) p = p.right;
+                else return p;
+            }
+            return null;
+        }
+
+        successor(t) {
+            if (!t) return null;
+            if (t.right !== null) {
+                let p = t.right;
+                while (p.left !== null) p = p.left;
+                return p;
+            }
+            let p = t.parent;
+            let ch = t;
+            while (p !== null && ch === p.right) {
+                ch = p;
+                p = p.parent;
+            }
+            return p;
+        }
+
+        firstEntry() {
+            if (!this.root) return null;
+            let p = this.root;
+            while (p.left) p = p.left;
+            return p;
+        }
+
+        lastEntry() {
+            if (!this.root) return null;
+            let p = this.root;
+            while (p.right) p = p.right;
+            return p;
+        }
+
+        floorEntry(k) {
+            let p = this.root, best = null;
+            while (p) {
+                if (k === p.key) return p;
+                if (k > p.key) { best = p; p = p.right; }
+                else { p = p.left; }
+            }
+            return best;
+        }
+
+        ceilingEntry(k) {
+            let p = this.root, best = null;
+            while (p) {
+                if (k === p.key) return p;
+                if (k < p.key) { best = p; p = p.left; }
+                else { p = p.right; }
+            }
+            return best;
+        }
+
+        getBlackHeight() {
+            if (!this.root) return 0;
+            let count = 0, p = this.root;
+            while (p) {
+                if (p.color === BLACK) count++;
+                p = p.left;
+            }
+            return count + 1;
+        }
+
+        resetHighlights(node = this.root) {
+            if (!node) return;
+            node.highlight = 0;
+            this.resetHighlights(node.left);
+            this.resetHighlights(node.right);
+        }
+    }
+
+    const map = new TreeMap();
+
+    // =========================================================================
+    // DIBUJO Y POSICIONAMIENTO EN CANVAS
+    // =========================================================================
+    function calcPositions(root, canvasWidth) {
+        if (!root) return [];
+        const order = [];
+        function inOrder(n, depth) {
+            if (!n) return;
+            inOrder(n.left, depth + 1);
+            n.depth = depth;
+            order.push(n);
+            inOrder(n.right, depth + 1);
+        }
+        inOrder(root, 0);
+
+        const N = order.length;
+        const availableW = canvasWidth - 160;
+        const dx = N <= 1 ? 0 : Math.max(76, Math.min(105, availableW / (N - 1)));
+        const totalW = (N - 1) * dx;
+        const startX = Math.max(80, (canvasWidth - totalW) / 2);
+
+        order.forEach((n, idx) => {
+            n.x = startX + idx * dx;
+            n.y = 70 + n.depth * 80;
+        });
+
+        return order;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        renderedEntries = calcPositions(map.root, canvas.width);
+
+        statSize.textContent = map.size;
+        statBh.textContent = map.getBlackHeight();
+
+        if (!map.root) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('El TreeMap está vacío. Usa "put(K, V)" o "Ejemplo Ayudantía" arriba.', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        // Aristas
+        renderedEntries.forEach(n => {
+            if (n.left) drawEdge(n, n.left);
+            if (n.right) drawEdge(n, n.right);
+        });
+
+        // Nodos (Tarjetas clave -> valor)
+        renderedEntries.forEach(n => drawEntry(n));
+    }
+
+    function drawEdge(parent, child) {
+        ctx.beginPath();
+        ctx.moveTo(parent.x, parent.y);
+        const midY = (parent.y + child.y) / 2;
+        ctx.bezierCurveTo(parent.x, midY, child.x, midY, child.x, child.y);
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    }
+
+    function drawEntry(n) {
+        const w = 74;
+        const h = 46;
+        const r = 8;
+        const left = n.x - w / 2;
+        const top = n.y - h / 2;
+
+        // Halo si está resaltado
+        if (n.highlight === 1) { // Encontrado
+            ctx.beginPath();
+            ctx.roundRect(left - 5, top - 5, w + 10, h + 10, r + 4);
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+            ctx.fill();
+        } else if (n.highlight === 2) { // Recién modificado
+            ctx.beginPath();
+            ctx.roundRect(left - 4, top - 4, w + 8, h + 8, r + 3);
+            ctx.fillStyle = 'rgba(99, 102, 241, 0.45)';
+            ctx.fill();
+        }
+
+        // Fondo y borde de la tarjeta según color Rojo/Negro
+        ctx.beginPath();
+        ctx.roundRect(left, top, w, h, r);
+
+        if (n.color === RED) {
+            ctx.fillStyle = '#dc2626';
+            ctx.strokeStyle = '#ef4444';
+        } else {
+            ctx.fillStyle = '#1e293b';
+            ctx.strokeStyle = '#475569';
+        }
+        ctx.lineWidth = 2.5;
+        ctx.fill();
+        ctx.stroke();
+
+        // Franja superior de acento
+        ctx.beginPath();
+        ctx.roundRect(left, top, w, 5, [r, r, 0, 0]);
+        ctx.fillStyle = n.color === RED ? '#f87171' : '#64748b';
+        ctx.fill();
+
+        // Texto Clave (Key)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 13px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`K: ${n.key}`, n.x, n.y - 7);
+
+        // Texto Valor (Value)
+        ctx.fillStyle = n.color === RED ? '#fecaca' : '#cbd5e1';
+        ctx.font = '500 11px Inter, sans-serif';
+        const displayVal = (n.value || '').length > 8 ? (n.value.slice(0, 7) + '…') : (n.value || 'null');
+        ctx.fillText(displayVal, n.x, n.y + 11);
+
+        // Badge de color (R o N)
+        ctx.fillStyle = n.color === RED ? '#fee2e2' : '#94a3b8';
+        ctx.font = 'bold 8px Inter, sans-serif';
+        ctx.fillText(n.color === RED ? 'R' : 'N', n.x + w / 2 - 8, n.y - h / 2 + 10);
+    }
+
+    // =========================================================================
+    // CONTROLADORES DE INTERFAZ
+    // =========================================================================
+    function showMsg(txt, isError = false) {
+        msgEl.textContent = txt;
+        msgEl.className = isError 
+            ? 'text-rose-400 font-semibold truncate' 
+            : 'text-slate-200 font-medium truncate';
+    }
+
+    function getInputs() {
+        const kInp = document.getElementById('inputKey');
+        const vInp = document.getElementById('inputVal');
+        const k = parseInt(kInp.value);
+        const v = vInp.value.trim();
+        return { k: isNaN(k) ? null : k, v: v || `v${k}` };
+    }
+
+    function insertNode() {
+        const { k, v } = getInputs();
+        if (k === null) return showMsg("Ingresa una clave entera válida.", true);
+        map.resetHighlights();
+        const res = map.put(k, v);
+        draw();
+        showMsg(res.msg, !res.ok);
+        document.getElementById('inputKey').value = '';
+        document.getElementById('inputVal').value = '';
+        document.getElementById('inputKey').focus();
+    }
+
+    function deleteNode(keyToDelete = null) {
+        let k = keyToDelete;
+        if (k === null) {
+            k = parseInt(document.getElementById('inputKey').value);
+        }
+        if (isNaN(k)) return showMsg("Ingresa la clave numérica a eliminar.", true);
+        map.resetHighlights();
+        const res = map.remove(k);
+        draw();
+        showMsg(res.msg, !res.ok);
+        if (keyToDelete === null) document.getElementById('inputKey').value = '';
+    }
+
+    function searchNode() {
+        const k = parseInt(document.getElementById('inputKey').value);
+        if (isNaN(k)) return showMsg("Ingresa la clave numérica a buscar.", true);
+        map.resetHighlights();
+        const entry = map.getEntry(k);
+        if (entry) {
+            entry.highlight = 1;
+            draw();
+            showMsg(`✓ Encontrado: get(${k}) = "${entry.value}" (Color: ${entry.color === RED ? 'ROJO' : 'NEGRO'})`);
+        } else {
+            draw();
+            showMsg(`✗ No encontrado: get(${k}) = null (clave no existe en el mapa)`, true);
+        }
+    }
+
+    function getExtremes(type) {
+        map.resetHighlights();
+        const e = type === 'first' ? map.firstEntry() : map.lastEntry();
+        if (!e) return showMsg("El TreeMap está vacío", true);
+        e.highlight = 1;
+        draw();
+        showMsg(`${type}Entry() = [${e.key} : "${e.value}"] (Color: ${e.color === RED ? 'ROJO' : 'NEGRO'})`);
+    }
+
+    function runFloorCeiling(type) {
+        const k = parseInt(document.getElementById('inputKey').value);
+        if (isNaN(k)) return showMsg(`Ingresa una clave para ${type}Key(K)`, true);
+        map.resetHighlights();
+        const e = type === 'floor' ? map.floorEntry(k) : map.ceilingEntry(k);
+        if (!e) return showMsg(`${type}Key(${k}) = null (no existe entrada en ese rango)`, true);
+        e.highlight = 1;
+        draw();
+        showMsg(`${type}Key(${k}) = ${e.key} [valor: "${e.value}"]`);
+    }
+
+    function clearTree() {
+        map.root = null;
+        map.size = 0;
+        draw();
+        showMsg("TreeMap vaciado.");
+    }
+
+    function loadExample() {
+        clearTree();
+        // Ejemplo de la ayudantía
+        const pairs = [
+            { k: 20, v: "Ana" },
+            { k: 10, v: "Benja" },
+            { k: 30, v: "Carla" },
+            { k: 15, v: "Diego" },
+            { k: 25, v: "Elisa" },
+            { k: 12, v: "Fran" }
+        ];
+        let i = 0;
+        function step() {
+            if (i < pairs.length) {
+                map.resetHighlights();
+                const res = map.put(pairs[i].k, pairs[i].v);
+                draw();
+                showMsg(`[Paso ${i+1}/${pairs.length}] ${res.msg}`);
+                i++;
+                setTimeout(step, 800);
+            } else {
+                showMsg("¡Secuencia de ayudantía cargada! Observa el balanceo automático y las alturas negras.");
+            }
+        }
+        step();
+    }
+
+    // Clic en canvas para interactuar / eliminar
+    canvas.addEventListener('mousedown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        for (let n of renderedEntries) {
+            if (mx >= n.x - 37 && mx <= n.x + 37 && my >= n.y - 23 && my <= n.y + 23) {
+                deleteNode(n.key);
+                break;
+            }
+        }
+    });
+
+    resize();
+</script>
+</body>
+</html>

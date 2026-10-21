@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Priority Queue Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f8fafc; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; }
+        #canvas-container { position: relative; width: 100vw; flex-grow: 1; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #array-container { height: 100px; background: #fff; border-top: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: flex-start; padding: 0 20px; overflow-x: auto; gap: 8px; }
+        .array-cell { min-width: 50px; height: 50px; border: 2px solid #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f1f5f9; position: relative; }
+        .array-cell.highlight { border-color: #f59e0b; background: #fef3c7; }
+        .array-index { position: absolute; bottom: -20px; font-size: 10px; color: #94a3b8; }
+        .array-val { font-weight: bold; color: #334155; }
+    </style>
+</head>
+<body class="h-screen">
+
+    <div class="h-20 bg-white shadow-md flex items-center justify-center gap-3 px-4 z-10">
+        <div class="font-bold text-xl text-amber-600 mr-2">Priority Queue</div>
+        <select id="heapType" onchange="toggleHeapType()" class="border border-slate-300 rounded px-2 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-sm">
+            <option value="min">Min-Heap</option>
+            <option value="max">Max-Heap</option>
+        </select>
+        <input type="number" id="inputValue" placeholder="Valor" class="border border-slate-300 rounded px-3 py-2 w-28 focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <button onclick="insertVal()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded transition shadow">Insertar</button>
+        <button onclick="pollVal()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition shadow">Poll (Eliminar Extremo)</button>
+        <button onclick="searchVal()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition shadow">Buscar</button>
+        <div id="message" class="ml-4 text-sm font-semibold text-slate-600"></div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="treeCanvas"></canvas>
+    </div>
+    
+    <div id="array-container">
+        <!-- Generado dinámicamente -->
+    </div>
+
+<script>
+    const canvas = document.getElementById('treeCanvas');
+    const ctx = canvas.getContext('2d');
+    const arrayContainer = document.getElementById('array-container');
+    const msgEl = document.getElementById('message');
+    let nodeCoords = [];
+
+    function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+        draw();
+    }
+    window.addEventListener('resize', resize);
+
+    class PriorityQueue {
+        constructor() {
+            this.heap = [];
+            this.isMin = true;
+            this.highlightIndex = -1;
+        }
+
+        compare(a, b) {
+            return this.isMin ? (a - b) : (b - a);
+        }
+
+        insert(val) {
+            this.heap.push(val);
+            this.siftUp(this.heap.length - 1);
+        }
+
+        poll() {
+            if (this.heap.length === 0) return null;
+            if (this.heap.length === 1) return this.heap.pop();
+            const root = this.heap[0];
+            this.heap[0] = this.heap.pop();
+            this.siftDown(0);
+            return root;
+        }
+        
+        removeAt(idx) {
+            if (idx < 0 || idx >= this.heap.length) return;
+            if (idx === this.heap.length - 1) { this.heap.pop(); return; }
+            this.heap[idx] = this.heap.pop();
+            // Try both up and down to fix the heap
+            const parent = Math.floor((idx - 1) / 2);
+            if (idx > 0 && this.compare(this.heap[idx], this.heap[parent]) < 0) {
+                this.siftUp(idx);
+            } else {
+                this.siftDown(idx);
+            }
+        }
+
+        siftUp(idx) {
+            let parent = Math.floor((idx - 1) / 2);
+            while (idx > 0 && this.compare(this.heap[idx], this.heap[parent]) < 0) {
+                [this.heap[idx], this.heap[parent]] = [this.heap[parent], this.heap[idx]];
+                idx = parent;
+                parent = Math.floor((idx - 1) / 2);
+            }
+        }
+
+        siftDown(idx) {
+            let left = 2 * idx + 1;
+            let right = 2 * idx + 2;
+            let smallestOrLargest = idx;
+
+            if (left < this.heap.length && this.compare(this.heap[left], this.heap[smallestOrLargest]) < 0) {
+                smallestOrLargest = left;
+            }
+            if (right < this.heap.length && this.compare(this.heap[right], this.heap[smallestOrLargest]) < 0) {
+                smallestOrLargest = right;
+            }
+
+            if (smallestOrLargest !== idx) {
+                [this.heap[idx], this.heap[smallestOrLargest]] = [this.heap[smallestOrLargest], this.heap[idx]];
+                this.siftDown(smallestOrLargest);
+            }
+        }
+
+        rebuildHeap() {
+            const oldHeap = [...this.heap];
+            this.heap = [];
+            oldHeap.forEach(v => this.insert(v));
+        }
+        
+        search(val) {
+            this.highlightIndex = this.heap.indexOf(val);
+            return this.highlightIndex !== -1;
+        }
+    }
+
+    const pq = new PriorityQueue();
+
+    function showMsg(txt, isError=false) {
+        msgEl.textContent = txt;
+        msgEl.style.color = isError ? 'red' : '#475569';
+        setTimeout(() => msgEl.textContent = '', 3000);
+    }
+
+    function toggleHeapType() {
+        const type = document.getElementById('heapType').value;
+        pq.isMin = (type === 'min');
+        pq.rebuildHeap();
+        pq.highlightIndex = -1;
+        draw();
+        updateArrayView();
+        showMsg(`Cambiado a ${pq.isMin ? 'Min-Heap' : 'Max-Heap'}`);
+    }
+
+    function getVal() {
+        const v = parseInt(document.getElementById('inputValue').value);
+        return isNaN(v) ? null : v;
+    }
+
+    function insertVal() {
+        const val = getVal();
+        if (val === null) return showMsg("Ingresa un número", true);
+        pq.highlightIndex = -1;
+        pq.insert(val);
+        draw(); updateArrayView();
+        showMsg(`Insertado: ${val}`);
+    }
+
+    function pollVal() {
+        pq.highlightIndex = -1;
+        const root = pq.poll();
+        if (root !== null) { draw(); updateArrayView(); showMsg(`Extraído: ${root}`); }
+        else showMsg("Cola vacía", true);
+    }
+
+    function searchVal() {
+        const val = getVal();
+        if (val === null) return showMsg("Ingresa un número", true);
+        if (pq.search(val)) { draw(); updateArrayView(); showMsg(`Encontrado: ${val}`); }
+        else { pq.highlightIndex = -1; draw(); updateArrayView(); showMsg(`No encontrado: ${val}`, true); }
+    }
+
+    function updateArrayView() {
+        arrayContainer.innerHTML = '';
+        pq.heap.forEach((val, i) => {
+            const div = document.createElement('div');
+            div.className = `array-cell ${i === pq.highlightIndex ? 'highlight' : ''}`;
+            div.innerHTML = `<span class="array-val">${val}</span><span class="array-index">[${i}]</span>`;
+            arrayContainer.appendChild(div);
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        nodeCoords = [];
+        if (pq.heap.length === 0) return;
+
+        // Calculate coordinates
+        const startX = canvas.width / 2;
+        const startY = 40;
+        const dy = 70;
+        
+        pq.heap.forEach((val, i) => {
+            const level = Math.floor(Math.log2(i + 1));
+            const levelStartIdx = Math.pow(2, level) - 1;
+            const nodesInLevel = Math.pow(2, level);
+            const posInLevel = i - levelStartIdx;
+            
+            // Distribute horizontally
+            const sectionWidth = canvas.width / nodesInLevel;
+            const x = (sectionWidth * posInLevel) + (sectionWidth / 2);
+            const y = startY + level * dy;
+            nodeCoords.push({x, y, val, i});
+        });
+
+        // Draw edges
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#cbd5e1';
+        nodeCoords.forEach((node) => {
+            const leftIdx = 2 * node.i + 1;
+            const rightIdx = 2 * node.i + 2;
+            if (leftIdx < pq.heap.length) {
+                ctx.beginPath(); ctx.moveTo(node.x, node.y); ctx.lineTo(nodeCoords[leftIdx].x, nodeCoords[leftIdx].y); ctx.stroke();
+            }
+            if (rightIdx < pq.heap.length) {
+                ctx.beginPath(); ctx.moveTo(node.x, node.y); ctx.lineTo(nodeCoords[rightIdx].x, nodeCoords[rightIdx].y); ctx.stroke();
+            }
+        });
+
+        // Draw nodes
+        nodeCoords.forEach((node) => {
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, 18, 0, Math.PI * 2);
+            ctx.fillStyle = node.i === pq.highlightIndex ? '#fbbf24' : '#ffffff';
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.stroke();
+
+            ctx.fillStyle = node.i === pq.highlightIndex ? '#78350f' : '#b45309';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(node.val, node.x, node.y);
+            
+            // Subscript index
+            ctx.font = '10px Arial';
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(`[${node.i}]`, node.x + 25, node.y - 10);
+        });
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        
+        for (let n of nodeCoords) {
+            if (Math.hypot(n.x - mx, n.y - my) < 18) {
+                pq.removeAt(n.i);
+                pq.highlightIndex = -1;
+                draw();
+                updateArrayView();
+                showMsg(`Eliminado por clic: ${n.val} en índice [${n.i}]`);
+                break;
+            }
+        }
+    });
+
+    resize();
+</script>
+</body>
+</html>
